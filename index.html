@@ -346,6 +346,8 @@ body.indent-guides .node.has-children>.nrow::before{content:'';position:absolute
 .tm-row:hover .tm-acts,.tm-row.focused .tm-acts{opacity:1}
 .tm-act{background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text3);font-family:var(--mono);font-size:9px;padding:2px 6px;cursor:pointer;transition:all .1s}
 .tm-act:hover{border-color:var(--border2);color:var(--text2)}
+.tm-act.tm-act-synced{border-color:rgba(66,133,244,.4);color:#4285f4}
+.tm-act.tm-act-synced:hover{border-color:rgba(66,133,244,.7);background:rgba(66,133,244,.08)}
 .todo-date{font-family:var(--mono);font-size:9px;color:var(--text3)}
 .todo-age{font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:3px;background:var(--bg4);color:var(--text3)}
 .todo-age.overdue{background:var(--overdue-glow);color:var(--overdue);border:1px solid rgba(196,98,45,.3)}
@@ -1076,11 +1078,11 @@ body.theme-intersection .sbi.on .ico{color:var(--accent)}
   <div class="hsep"></div>
   <div class="hact">
     <span id="syncStatus" style="display:inline-flex;align-items:center;color:var(--text3);margin-right:4px;transition:color .3s ease;cursor:default" title="Sync status"><i data-lucide="cloud" class="li-sm"></i></span>
-    <button class="bico" title="Search ⌘K" onclick="openSearch()"><i data-lucide="search" class="li-lg"></i></button>
+    <button class="bico" title="Search Ctrl/⌘K" onclick="openSearch()"><i data-lucide="search" class="li-lg"></i></button>
     <button class="bico" id="appModeBtn" title="Quick Capture / Workflow mode (Ctrl+`)" onclick="toggleAppMode()"><i data-lucide="zap" class="li-lg"></i></button>
-    <button class="bico" id="sbBtn" title="Toggle Navigate panel (⌘[)" onclick="togglePanelPin('nav')"><i data-lucide="panel-left" class="li-lg"></i></button>
-    <button class="bico" id="agendaBtn" title="Toggle Agenda panel (⌘])" onclick="togglePanelPin('agenda')"><i data-lucide="panel-right" class="li-lg"></i></button>
-    <button class="bico" title="Settings ⌘," onclick="openSettings()"><i data-lucide="settings" class="li-lg"></i></button>
+    <button class="bico" id="sbBtn" title="Toggle Navigate panel (Ctrl/⌘[)" onclick="togglePanelPin('nav')"><i data-lucide="panel-left" class="li-lg"></i></button>
+    <button class="bico" id="agendaBtn" title="Toggle Agenda panel (Ctrl/⌘])" onclick="togglePanelPin('agenda')"><i data-lucide="panel-right" class="li-lg"></i></button>
+    <button class="bico" title="Settings Ctrl/⌘," onclick="openSettings()"><i data-lucide="settings" class="li-lg"></i></button>
   </div>
 </header>
 <div class="app">
@@ -1147,11 +1149,11 @@ body.theme-intersection .sbi.on .ico{color:var(--accent)}
       </div>
       <div class="gcal-arrow">›</div>
     </div>
-    <div class="gcal-connect" onclick="_mockView='gmail';openMockCal();switchMockView('gmail')" style="border-color:rgba(91,191,176,.2)">
+    <div class="gcal-connect" id="gmailConnectTile" onclick="connectGmail()" style="border-color:rgba(91,191,176,.2)">
       <div class="gcal-icon"><i data-lucide="mail" class="li-lg"></i></div>
-      <div class="gcal-text">
-        <div class="gcal-title" style="color:var(--text2)">Connect Gmail</div>
-        <div class="gcal-sub">Preview mock integration →</div>
+      <div class="gcal-text" id="gmailConnectText">
+        <div class="gcal-title" style="color:var(--text2)">Gmail</div>
+        <div class="gcal-sub">Connect to sync inbox →</div>
       </div>
       <div class="gcal-arrow">›</div>
     </div>
@@ -1200,7 +1202,7 @@ body.theme-intersection .sbi.on .ico{color:var(--accent)}
         <div class="csw" style="background:var(--warm-blue)" title="Blue" onmousedown="event.preventDefault();setColor('blue')"></div>
       </div>
       <div class="tbsep"></div>
-      <button class="tbb" onclick="toggleDone()" title="⌘D"><i data-lucide="check" class="li-sm"></i> done</button>
+      <button class="tbb" onclick="toggleDone()" title="Ctrl+Shift/⌘D"><i data-lucide="check" class="li-sm"></i> done</button>
       <button class="tbb" id="nodeModeBtn" onmousedown="event.preventDefault()" onclick="toggleNodeMode()" title="Ctrl+/ to toggle"><i data-lucide="circle-dot" class="li-sm"></i> bullet</button>
     </div>
 
@@ -1208,7 +1210,7 @@ body.theme-intersection .sbi.on .ico{color:var(--accent)}
 <div class="gravity-banner" id="gravityBanner">
   <div class="gravity-banner-icon">⚠</div>
   <div class="gravity-banner-text" id="gravityBannerText">You have overdue todos that need attention</div>
-  <button class="gravity-banner-btn" onclick="openTodosModal()">View To-Dos ⌘U</button>
+  <button class="gravity-banner-btn" onclick="openTodosModal()">View To-Dos Ctrl/⌘U</button>
   <button class="gravity-banner-btn" onclick="document.getElementById('gravityBanner').classList.remove('visible')" style="background:transparent;border-color:transparent;color:var(--text3)">✕</button>
 </div>
 
@@ -1358,12 +1360,14 @@ body.theme-intersection .sbi.on .ico{color:var(--accent)}
   <div class="ctxi" onclick="ctxDo('indent')"><i data-lucide="indent" class="li-sm"></i> Indent<span class="ctxsc">Tab</span></div>
   <div class="ctxi" onclick="ctxDo('unindent')"><i data-lucide="outdent" class="li-sm"></i> Unindent<span class="ctxsc">⇧Tab</span></div>
   <div class="ctxi" onclick="ctxDo('collapse')"><i data-lucide="chevrons-up-down" class="li-sm"></i> Collapse/Expand</div>
-  <div class="ctxi" onclick="ctxDo('done')"><i data-lucide="check" class="li-sm"></i> Mark done<span class="ctxsc">⌘D</span></div>
+  <div class="ctxi" onclick="ctxDo('done')"><i data-lucide="check" class="li-sm"></i> Mark done<span class="ctxsc">Ctrl+⇧/⌘D</span></div>
   <div class="ctxsep"></div>
   <div class="ctxi" onclick="ctxDo('dupe')"><i data-lucide="copy" class="li-sm"></i> Duplicate</div>
   <div class="ctxi" onclick="ctxDo('copy')"><i data-lucide="clipboard" class="li-sm"></i> Copy text</div>
   <div class="ctxi" onclick="ctxDo('cut')"><i data-lucide="scissors" class="li-sm"></i> Cut</div>
   <div class="ctxi" onclick="ctxPaste()"><i data-lucide="clipboard-paste" class="li-sm"></i> Paste</div>
+  <div class="ctxsep" id="ctxGTaskSep" style="display:none"></div>
+  <div class="ctxi" id="ctxGTask" onclick="ctxDo('gtask')" style="display:none"><i data-lucide="check-circle" class="li-sm"></i> <span id="ctxGTaskLabel">Push to Google Tasks →</span></div>
   <div class="ctxsep"></div>
   <div class="ctxi del" onclick="ctxDo('del')"><i data-lucide="trash-2" class="li-sm"></i> Delete</div>
 </div>
@@ -1450,7 +1454,7 @@ body.theme-intersection .sbi.on .ico{color:var(--accent)}
         <button class="mock-view-tab active" id="tab-cal" onclick="switchMockView('cal')"><i data-lucide="calendar" class="li-sm"></i> Calendar</button>
         <button class="mock-view-tab" id="tab-gmail" onclick="switchMockView('gmail')"><i data-lucide="mail" class="li-sm"></i> Gmail</button>
       </div>
-      <div class="mock-cal-sub">MOCK DATA</div>
+      <div class="mock-cal-sub" id="mockDataBadge">MOCK DATA</div>
       <div class="mock-cal-close" onclick="closeMockCal()"><i data-lucide="x"></i></div>
     </div>
     <div class="mock-cal-body" id="mockCalBody"></div>
@@ -2845,6 +2849,7 @@ function syncPageFromDOM(){
       ...(nodeEl.dataset.heading ? { heading: nodeEl.dataset.heading } : (existingNode.heading ? { heading: existingNode.heading } : {})),
       ...(existingNode.embed ? { embed: existingNode.embed, embedUrl: existingNode.embedUrl } : {}),
       ...(nodeEl.dataset.imgSrc ? { imageData: nodeEl.dataset.imgSrc, imageSize: parseInt(nodeEl.dataset.imgSize||'1') } : existingNode.imageData ? { imageData: existingNode.imageData, imageSize: existingNode.imageSize||1 } : {}),
+      ...(existingNode.gTaskId ? { gTaskId: existingNode.gTaskId } : {}),
     };
   }
 
@@ -3630,8 +3635,8 @@ function nkey(e,div,node,depth){
   }
   // Ctrl+/ = toggle para/bullet
   if(e.ctrlKey&&!e.metaKey&&!e.altKey&&e.key==='/'){ e.preventDefault(); setNodePara(div,node,!node.para); }
-  // ⌘. = collapse/expand current node
-  if(e.metaKey&&e.key==='.'){ e.preventDefault(); div.classList.toggle('collapsed'); }
+  // Ctrl/⌘. = collapse/expand current node
+  if((e.metaKey||e.ctrlKey)&&e.key==='.'){ e.preventDefault(); div.classList.toggle('collapsed'); }
 }
 
 function setNodePara(div,node,para){
@@ -3897,6 +3902,16 @@ function makeTMRow(nodeId, todo){
     deferBtn.textContent='↷ Defer';
     deferBtn.onclick=e=>{ e.stopPropagation(); openDeferModal(nodeId,todo); };
     acts.appendChild(deferBtn);
+    if(_gisToken){
+      const _nd2=DB.nodes_ref?.[nodeId];
+      const gtBtn=document.createElement('button');
+      const isSynced=!!_nd2?.gTaskId;
+      gtBtn.className='tm-act'+(isSynced?' tm-act-synced':'');
+      gtBtn.textContent=isSynced?'✓ G Tasks':'→ Tasks';
+      gtBtn.title=isSynced?'Remove from Google Tasks':'Push to Google Tasks';
+      gtBtn.onclick=e=>{ e.stopPropagation(); if(_nd2?.gTaskId) removeFromGTasks(_nd2); else if(_nd2) pushNodeToGTasks(_nd2); };
+      acts.appendChild(gtBtn);
+    }
   }
   const jumpBtn=document.createElement('button');
   jumpBtn.className='tm-act';
@@ -3997,6 +4012,15 @@ function toggleTodoById(nodeId){
   updateTodoCount(); renderDB();
   const tModal=document.getElementById('todosModal');
   if(tModal&&tModal.classList.contains('open')) renderTodosModal();
+  // Keep Google Tasks in sync
+  const _nd=DB.nodes_ref?.[nodeId];
+  if(_nd?.gTaskId && _gisToken){
+    const _patch = todo.done ? {status:'completed',completed:new Date().toISOString()} : {status:'needsAction',completed:null};
+    fetch(`https://tasks.googleapis.com/tasks/v1/lists/@default/tasks/${encodeURIComponent(_nd.gTaskId)}`,{
+      method:'PATCH', headers:{Authorization:`Bearer ${_gisToken}`,'Content-Type':'application/json'},
+      body:JSON.stringify(_patch)
+    }).catch(()=>{});
+  }
   toast(todo.done?'✓ Marked complete':'↩ Reopened');
 }
 
@@ -4185,6 +4209,19 @@ function showCtx(x,y){
     const countEl = document.getElementById('ctxDelSelCount');
     if(countEl) countEl.textContent = selCount + ' nodes';
   }
+  // Show/hide Google Tasks item based on whether node is a todo
+  const gTaskItem=document.getElementById('ctxGTask');
+  const gTaskSep=document.getElementById('ctxGTaskSep');
+  if(gTaskItem&&gTaskSep){
+    const _nd=DB.nodes_ref?.[S.ctxNode?.dataset?.id];
+    const _isTodo=_nd&&/\#todo\b/i.test(_nd.text);
+    gTaskItem.style.display=_isTodo?'flex':'none';
+    gTaskSep.style.display=_isTodo?'block':'none';
+    if(_isTodo){
+      const _lbl=document.getElementById('ctxGTaskLabel');
+      if(_lbl) _lbl.textContent=_nd.gTaskId?'✓ Synced · Remove from Tasks':'Push to Google Tasks →';
+    }
+  }
   const m=document.getElementById('ctx');
   m.style.left=x+'px'; m.style.top=y+'px'; m.style.visibility='hidden';
   m.classList.add('open');
@@ -4293,6 +4330,12 @@ function ctxDo(action){
   else if(action==='h1'||action==='h2'||action==='h3'||action==='h-none'){
     const lvl=action==='h-none'?null:action;
     targets.forEach(n=>setHeading(n,lvl));
+  }
+  else if(action==='gtask'){
+    const nd=DB.nodes_ref?.[t.dataset?.id];
+    if(!nd) return;
+    if(nd.gTaskId) removeFromGTasks(nd);
+    else pushNodeToGTasks(nd);
   }
 }
 
@@ -5459,13 +5502,13 @@ function closeTagModalDirect(){ document.getElementById('tagModal').classList.re
 
 function openShortcutHelp(){
   const shortcuts=[
-    ['⌘K','Command palette'],['⌘D','Toggle done'],['⌘S','Save'],['⌘?','Toggle left sidebar'],
+    ['Ctrl/⌘K','Command palette'],['Ctrl+⇧/⌘D','Toggle done'],['Ctrl/⌘S','Save'],['⌘?','Toggle left sidebar (Mac)'],
         ['Ctrl+`','Focus / writing mode'],
         ['⌘E','Toggle side panel'],
     ['Tab','Indent'],['⇧Tab','Unindent'],['Enter','New node (same indent)'],
     ['⌫ on empty','Delete node'],['↑↓','Navigate nodes'],
     ['Ctrl+/','Toggle paragraph / bullet'],
-    ['Ctrl+T','Jump to Today'],['Ctrl+U / ⌘U','All To-Dos'],
+    ['Ctrl+T','Jump to Today'],['Ctrl/⌘U','All To-Dos'],
     ['Ctrl+`','Focus / writing mode'],
     ['Dbl-click bullet','Zoom in'],['Esc','Zoom out / close'],
     ['Click tag','Open tag panel'],['Dbl-click tag','Open tag modal'],
@@ -5830,6 +5873,7 @@ function openTodosModal(){
   renderTodosModal();
   document.getElementById('todosModal').classList.add('open');
   setTimeout(()=>document.getElementById('tmSearch')?.focus(),60);
+  syncGoogleTasksStatus();
 }
 function closeTodosModal(e){
   if(!e||e.target===document.getElementById('todosModal'))
@@ -6032,8 +6076,8 @@ const ONB_STEPS=[
   {target:'#oRoot',title:'The outliner — your demo page',desc:'This is the apexNotetaker outliner.\n\nEvery line is a node:\n● Enter — new bullet\n● Tab — indent deeper\n● Shift+Tab — unindent\n● Click ● dot to select & drag\n● Right-click for colors, cut, paste, zoom',pos:'left'},
   {target:'#oRoot',title:'Todos & natural language',desc:'Type #todo on any line to flag it as a task.\n\nNatural language works too:\n"Follow up next Monday" → auto-schedules\n"Review in 3 days" → auto-schedules\n\nThe date phrase highlights in rose — hover to see the × dismiss.',pos:'left'},
   {target:'.toolbar',title:'Toolbar — format & color',desc:'Bold (⌘B), Italic (⌘I), and 10 semantic colors.\n\nThe ● / ¶ button switches between bullet and paragraph mode — great for longer writing.\n\nRight-click any bullet to set its color directly.',pos:'bottom'},
-  {target:'#agendaPanel',title:'Agenda — Calendar & Integrations',desc:'The right panel shows your week. Click any day to navigate.\n\nMock integrations available:\n⌘⇧G — Google Calendar\n⌘⇧M — Gmail\n\nInject any event or email as structured bullets with AI-classified todos.',pos:'left'},
-  {target:null,title:'You\'re set — the system compounds',desc:'Key shortcuts:\n⌘K — Search everything\n⌘U — All To-Dos + Projects\n⌘N — New Page\n⌘, — Settings\nCtrl+T — Jump to Today\n\nThe more you capture and tag, the more the system works for you.',pos:'center',finish:true},
+  {target:'#agendaPanel',title:'Agenda — Calendar & Integrations',desc:'The right panel shows your week. Click any day to navigate.\n\nMock integrations available:\nCtrl/⌘⇧G — Google Calendar\nCtrl/⌘⇧M — Gmail\n\nInject any event or email as structured bullets with AI-classified todos.',pos:'left'},
+  {target:null,title:'You\'re set — the system compounds',desc:'Key shortcuts:\nCtrl/⌘K — Search everything\nCtrl/⌘U — All To-Dos + Projects\n⌘N — New Page (Mac)\nCtrl/⌘, — Settings\nCtrl+T — Jump to Today\n\nThe more you capture and tag, the more the system works for you.',pos:'center',finish:true},
 ];
 let _onbStep=0;
 
@@ -6427,11 +6471,11 @@ function renderSettings(){
       ${sec('Keyboard Shortcuts')}
       ${box(`
         <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Navigation</div>
-        ${[['⌘K','Command palette'],['Ctrl+T','Jump to Today'],['⌘U','All To-Dos + Projects'],['⌘,','Settings'],['Esc','Back / close / zoom out'],['↑↓','Navigate nodes'],['→ at end','Next node']].map(([k,v])=>sc(k,v)).join('')}
+        ${[['Ctrl/⌘K','Command palette'],['Ctrl+T','Jump to Today'],['Ctrl/⌘U','All To-Dos + Projects'],['Ctrl/⌘,','Settings'],['Esc','Back / close / zoom out'],['↑↓','Navigate nodes'],['→ at end','Next node']].map(([k,v])=>sc(k,v)).join('')}
         <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin:10px 0 6px">Editing</div>
-        ${[['Enter','New node'],['⇧Enter','Line break'],['Tab','Indent'],['⇧Tab','Unindent'],['⌫ on empty','Delete node'],['⌘D','Toggle done'],['⌘S','Save now'],['Ctrl+/','Toggle para/bullet mode'],['Ctrl+\`','Focus / writing mode']].map(([k,v])=>sc(k,v)).join('')}
+        ${[['Enter','New node'],['⇧Enter','Line break'],['Tab','Indent'],['⇧Tab','Unindent'],['⌫ on empty','Delete node'],['Ctrl+⇧/⌘D','Toggle done'],['Ctrl/⌘S','Save now'],['Ctrl+/','Toggle para/bullet mode'],['Ctrl+\`','Focus / writing mode']].map(([k,v])=>sc(k,v)).join('')}
         <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin:10px 0 6px">Views & Panels</div>
-        ${[['⌘⇧G','Calendar overlay'],['⌘⇧M','Gmail overlay'],['⌘E','Toggle agenda panel'],['⌘?','Toggle sidebar'],['Dbl-click bullet','Zoom into node'],['⌘+Click','Multi-select'],['⇧+Click','Range select'],['Click tag','Filter by tag']].map(([k,v])=>sc(k,v)).join('')}
+        ${[['Ctrl/⌘⇧G','Calendar overlay'],['Ctrl/⌘⇧M','Gmail overlay'],['Ctrl/⌘[','Toggle nav panel'],['Ctrl/⌘]','Toggle agenda panel'],['Dbl-click bullet','Zoom into node'],['Ctrl/⌘+Click','Multi-select'],['⇧+Click','Range select'],['Click tag','Filter by tag']].map(([k,v])=>sc(k,v)).join('')}
       `,'max-height:480px;overflow-y:auto')}
     </div>
 
@@ -6665,13 +6709,15 @@ const MOCK_GMAIL_DATA = [
 // _mev declared at top
 
 // ══════════════════════════════════════════════
-// GOOGLE CALENDAR OAUTH
+// GOOGLE OAUTH (Calendar + Gmail)
 // ══════════════════════════════════════════════
 const GCAL_CLIENT_ID = '160312829232-h2q2id7kiua9hhf8ukaqrmu28bj5mujq.apps.googleusercontent.com';
-const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/tasks';
 let _gisToken = sessionStorage.getItem('apexGCalToken') || null;
 let _gisClient = null;
 let _realCalEvents = [];
+let _realGmailEmails = [];
+let _showMockDemo = false;
 
 function initGIS(){
   if(!window.google?.accounts?.oauth2) return;
@@ -6679,31 +6725,120 @@ function initGIS(){
     client_id: GCAL_CLIENT_ID,
     scope: GCAL_SCOPE,
     callback: async (response) => {
-      if(response.error){ toast('Calendar auth failed: '+response.error); return; }
+      if(response.error){ toast('Google auth failed: '+response.error); return; }
       _gisToken = response.access_token;
       sessionStorage.setItem('apexGCalToken', _gisToken);
       updateGCalConnectUI(true);
-      await fetchRealCalendarEvents();
+      updateGmailConnectUI(true);
+      await Promise.all([fetchRealCalendarEvents(), fetchRealGmailEmails()]);
     }
   });
-  if(_gisToken){ fetchRealCalendarEvents(); updateGCalConnectUI(true); }
+  if(_gisToken){
+    fetchRealCalendarEvents(); fetchRealGmailEmails();
+    updateGCalConnectUI(true); updateGmailConnectUI(true);
+  } else {
+    updateGCalConnectUI(false); updateGmailConnectUI(false);
+  }
 }
 
-function connectGoogleCalendar(){
+function _requestGoogleAuth(){
   if(!_gisClient) initGIS();
   if(!_gisClient){ toast('Auth library not ready — try again in a moment'); return; }
-  if(_gisToken){ openMockCal(); return; }
   _gisClient.requestAccessToken({prompt:''});
 }
 
-function disconnectGoogleCalendar(e){
+function connectGoogleCalendar(){
+  if(_gisToken){ openMockCal(); return; }
+  _requestGoogleAuth();
+}
+
+function connectGmail(){
+  if(_gisToken){ _mockView='gmail'; openMockCal(); switchMockView('gmail'); return; }
+  _requestGoogleAuth();
+}
+
+function disconnectGoogle(e){
   if(e) e.stopPropagation();
   if(_gisToken && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(_gisToken, ()=>{});
   _gisToken = null;
   _realCalEvents = [];
+  _realGmailEmails = [];
   sessionStorage.removeItem('apexGCalToken');
   updateGCalConnectUI(false);
-  toast('Google Calendar disconnected');
+  updateGmailConnectUI(false);
+  toast('Google account disconnected');
+}
+
+function _handleTokenExpiry(){
+  _gisToken = null;
+  sessionStorage.removeItem('apexGCalToken');
+  updateGCalConnectUI(false);
+  updateGmailConnectUI(false);
+  toast('Google session expired — reconnect');
+}
+
+// ── GOOGLE TASKS ──
+
+async function pushNodeToGTasks(nd){
+  if(!_gisToken){ _requestGoogleAuth(); return; }
+  let displayText = nd.text.replace(/#\w+(?::[a-zA-Z0-9_-]+)?/g,'').replace(/\s{2,}/g,' ').trim();
+  if(nd.nlPhrase) displayText = displayText.replace(new RegExp(nd.nlPhrase.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i'),'').replace(/\s{2,}/g,' ').trim();
+  const body = { title: displayText || nd.text };
+  if(nd.dueDate) body.due = nd.dueDate + 'T00:00:00.000Z';
+  try {
+    const resp = await fetch('https://tasks.googleapis.com/tasks/v1/lists/@default/tasks', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${_gisToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if(resp.status === 401){ _handleTokenExpiry(); return; }
+    const task = await resp.json();
+    nd.gTaskId = task.id;
+    saveToLocalStorage();
+    toast('✓ Pushed to Google Tasks');
+    if(document.getElementById('todosModal')?.classList.contains('open')) renderTodosModal();
+  } catch(err){ toast('Failed to push to Tasks'); }
+}
+
+async function removeFromGTasks(nd){
+  if(!nd.gTaskId) return;
+  const id = nd.gTaskId;
+  delete nd.gTaskId;
+  saveToLocalStorage();
+  toast('Removed from Google Tasks');
+  if(document.getElementById('todosModal')?.classList.contains('open')) renderTodosModal();
+  if(!_gisToken) return;
+  try {
+    await fetch(`https://tasks.googleapis.com/tasks/v1/lists/@default/tasks/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${_gisToken}` }
+    });
+  } catch(e){}
+}
+
+async function syncGoogleTasksStatus(){
+  if(!_gisToken) return;
+  const pushed = Object.entries(DB.nodes_ref).filter(([,n])=>n.gTaskId && !n.done);
+  if(!pushed.length) return;
+  let synced = 0;
+  await Promise.all(pushed.map(async ([id, nd])=>{
+    try {
+      const resp = await fetch(`https://tasks.googleapis.com/tasks/v1/lists/@default/tasks/${encodeURIComponent(nd.gTaskId)}`,
+        { headers: { Authorization: `Bearer ${_gisToken}` } });
+      if(resp.status === 401){ _handleTokenExpiry(); return; }
+      if(resp.status === 404){ delete nd.gTaskId; return; }
+      const task = await resp.json();
+      if(task.status === 'completed'){
+        nd.done = true;
+        if(DB.todos[id]) DB.todos[id].done = true;
+        const el = document.querySelector(`.node[data-id="${id}"]`);
+        if(el){ el.querySelector('.nc')?.classList.add('done'); el.classList.add('done-node'); }
+        synced++;
+      }
+    } catch(e){}
+  }));
+  if(synced){ saveToLocalStorage(); updateTodoCount(); renderDB();
+    toast(`↓ ${synced} task${synced>1?'s':''} synced from Google Tasks`); }
 }
 
 async function fetchRealCalendarEvents(){
@@ -6716,13 +6851,7 @@ async function fetchRealCalendarEvents(){
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=100`,
       {headers:{Authorization:`Bearer ${_gisToken}`}}
     );
-    if(resp.status === 401){
-      _gisToken = null;
-      sessionStorage.removeItem('apexGCalToken');
-      updateGCalConnectUI(false);
-      toast('Calendar session expired — reconnect');
-      return;
-    }
+    if(resp.status === 401){ _handleTokenExpiry(); return; }
     const data = await resp.json();
     _realCalEvents = (data.items||[]).map(_gcalEvToMock).filter(Boolean);
     updateGCalConnectUI(true);
@@ -6731,6 +6860,71 @@ async function fetchRealCalendarEvents(){
   } catch(err) {
     toast('Calendar fetch error — check connection');
   }
+}
+
+async function fetchRealGmailEmails(){
+  if(!_gisToken) return;
+  try {
+    const listResp = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=15&labelIds=INBOX',
+      {headers:{Authorization:`Bearer ${_gisToken}`}}
+    );
+    if(listResp.status === 401){ _handleTokenExpiry(); return; }
+    const listData = await listResp.json();
+    const ids = (listData.messages||[]).map(m=>m.id).slice(0,12);
+    if(!ids.length){ _realGmailEmails=[]; return; }
+    const msgs = await Promise.all(
+      ids.map(id=>fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+        {headers:{Authorization:`Bearer ${_gisToken}`}}
+      ).then(r=>r.json()))
+    );
+    _realGmailEmails = msgs.map(_gmailMsgToMock).filter(Boolean);
+    toast(`✓ ${_realGmailEmails.length} emails loaded from Gmail`);
+    if(document.getElementById('mockCal')?.classList.contains('open') && _mockView==='gmail') renderMockGmail();
+  } catch(err){ toast('Gmail fetch error — check connection'); }
+}
+
+function _gmailMsgToMock(msg){
+  const headers = msg.payload?.headers||[];
+  const get = n => headers.find(h=>h.name.toLowerCase()===n.toLowerCase())?.value||'';
+  const raw = get('From');
+  const fromMatch = raw.match(/^(.+?)\s*<(.+?)>$/) || ['','',''];
+  const fromName = (fromMatch[1]||raw).replace(/"/g,'').trim() || raw;
+  const fromEmail = fromMatch[2] || raw;
+  const subject = get('Subject')||'(no subject)';
+  const date = new Date(get('Date'));
+  const h = date.getHours()%12||12;
+  const ampm = date.getHours()>=12?'PM':'AM';
+  const timeStr = `${h}:${String(date.getMinutes()).padStart(2,'0')} ${ampm}`;
+  const body = _extractGmailBody(msg.payload).slice(0,800).trim();
+  const preview = body.split('\n').find(l=>l.trim().length>10)?.trim().slice(0,120) || subject;
+  const personal = ['gmail.com','yahoo.com','hotmail.com','outlook.com','icloud.com','me.com'];
+  const isPersonal = personal.some(d=>fromEmail.toLowerCase().endsWith(d));
+  const bizKw = /proposal|contract|client|meeting|demo|poc|invoice|quote|deliverable|timeline|scope/i;
+  const category = (!isPersonal && bizKw.test(subject+' '+body)) ? 'construct' : 'connect';
+  const read = !msg.labelIds?.includes('UNREAD');
+  return {id:msg.id, from:fromName, email:fromEmail, subject, preview, time:timeStr, category, read, body, todos:[], account:null, tags:[category], _real:true};
+}
+
+function _extractGmailBody(payload){
+  if(!payload) return '';
+  if(payload.body?.data) return _b64d(payload.body.data);
+  if(payload.parts){
+    const plain = payload.parts.find(p=>p.mimeType==='text/plain');
+    if(plain?.body?.data) return _b64d(plain.body.data);
+    for(const part of payload.parts){
+      if(part.parts){ const n=part.parts.find(p=>p.mimeType==='text/plain'); if(n?.body?.data) return _b64d(n.body.data); }
+    }
+    const html = payload.parts.find(p=>p.mimeType==='text/html');
+    if(html?.body?.data) return _b64d(html.body.data).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+  }
+  return '';
+}
+
+function _b64d(data){
+  try{ return decodeURIComponent(escape(atob(data.replace(/-/g,'+').replace(/_/g,'/')))); }
+  catch(e){ return atob(data.replace(/-/g,'+').replace(/_/g,'/')); }
 }
 
 function _gcalEvToMock(item){
@@ -6759,13 +6953,35 @@ function updateGCalConnectUI(connected){
     tile.style.borderColor = 'rgba(204,141,110,.35)';
     tile.style.opacity = '1';
     tile.onclick = openMockCal;
-    textEl.innerHTML = '<div class="gcal-title" style="color:var(--accent)">Google Calendar</div><div class="gcal-sub">Connected · <span style="text-decoration:underline;cursor:pointer" onclick="disconnectGoogleCalendar(event)">Disconnect</span></div>';
+    textEl.innerHTML = '<div class="gcal-title" style="color:var(--accent)">Google Calendar</div><div class="gcal-sub">Connected · <span style="text-decoration:underline;cursor:pointer" onclick="disconnectGoogle(event)">Disconnect</span></div>';
   } else {
     tile.style.borderColor = '';
     tile.style.opacity = '';
     tile.onclick = connectGoogleCalendar;
-    textEl.innerHTML = '<div class="gcal-title">Google Calendar</div><div class="gcal-sub">Connect to sync events →</div>';
+    textEl.innerHTML = '<div class="gcal-title">Google Calendar</div><div class="gcal-sub">Connect to sync · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();_showMockDemo=true;openMockCal()">Preview demo</span></div>';
   }
+}
+
+function updateGmailConnectUI(connected){
+  const tile = document.getElementById('gmailConnectTile');
+  const textEl = document.getElementById('gmailConnectText');
+  if(!tile || !textEl) return;
+  if(connected){
+    tile.style.borderColor = 'rgba(91,191,176,.4)';
+    tile.style.opacity = '1';
+    tile.onclick = ()=>{ _mockView='gmail'; openMockCal(); switchMockView('gmail'); };
+    textEl.innerHTML = '<div class="gcal-title" style="color:#5bbfb0">Gmail</div><div class="gcal-sub">Connected · <span style="text-decoration:underline;cursor:pointer" onclick="disconnectGoogle(event)">Disconnect</span></div>';
+  } else {
+    tile.style.borderColor = '';
+    tile.style.opacity = '';
+    tile.onclick = connectGmail;
+    textEl.innerHTML = '<div class="gcal-title" style="color:var(--text2)">Gmail</div><div class="gcal-sub">Connect to sync · <span style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();_showMockDemo=true;_mockView=\'gmail\';openMockCal();switchMockView(\'gmail\')">Preview demo</span></div>';
+  }
+}
+
+function _updateMockDemoUI(){
+  const badge = document.getElementById('mockDataBadge');
+  if(badge) badge.style.display = (!_gisToken || _showMockDemo) ? 'block' : 'none';
 }
 
 function openMockCal(){
@@ -6774,11 +6990,13 @@ function openMockCal(){
   document.getElementById('mockCal').classList.add('open');
   document.getElementById('tab-cal').classList.add('active');
   document.getElementById('tab-gmail').classList.remove('active');
+  _updateMockDemoUI();
   setTimeout(()=>{ if(typeof lucide!=='undefined') lucide.createIcons(); },10);
 }
 function closeMockCal(){
   document.getElementById('mockCal').classList.remove('open');
   closeMockEventDetail();
+  _showMockDemo = false;
 }
 function mockCalBgClick(e){
   if(e.target===document.getElementById('mockCal')) closeMockCal();
@@ -6815,7 +7033,13 @@ function renderMockGmail(){
   body.innerHTML='';
   const list=document.createElement('div');
   list.className='mock-gmail-list';
-  MOCK_GMAIL_DATA.forEach(email=>{
+  _updateMockDemoUI();
+  const emailData = (_realGmailEmails.length > 0 && !_showMockDemo) ? _realGmailEmails : MOCK_GMAIL_DATA;
+  const si=document.getElementById('mockViewSubtitle');
+  if(si) si.textContent = _realGmailEmails.length>0
+    ? `${_realGmailEmails.length} messages · inbox · Click any email to inject into outliner`
+    : 'Preview — Click any email to preview + inject action items into outliner';
+  emailData.forEach(email=>{
     const row=document.createElement('div');
     row.className='mock-email-row'+(email.read?'':' unread');
     const initials=email.from.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
@@ -6882,11 +7106,13 @@ function injectEmailItem(){
   setTimeout(()=>{
     const root=document.getElementById('oRoot');
     const el=buildNodeTree(node,0);
-    root.insertBefore(el,root.firstChild);
-    root.firstChild.querySelector('.nc')?.focus();
+    const _gs2=document.getElementById('gravitySurface');
+    if(_gs2) _gs2.after(el); else root.insertBefore(el,root.firstChild);
+    el.querySelector('.nc')?.focus();
     indexNode(nodeText,TODAY_KEY,node.id,false);
     todoKids.forEach(tn=>indexNode(tn.text,TODAY_KEY,tn.id,false));
     renderDB();renderSBPages();updateTagBadges();updateStatus();
+    if(S.currentPage===TODAY_KEY) surfaceGravityTodos();
     closeMockCal();
     toast('✉️ Injected: '+email.from.split(' ')[0]+' · '+(email.todos||[]).length+' to-dos created');
   },150);
@@ -6897,7 +7123,8 @@ function renderMockCal(){
   body.classList.remove('gmail-mode');
   body.innerHTML='';
 
-  if(_realCalEvents.length > 0){
+  _updateMockDemoUI();
+  if(_realCalEvents.length > 0 && !_showMockDemo){
     // Group real events by day
     const dayMap={};
     _realCalEvents.forEach(ev=>{ if(!dayMap[ev.dateKey]) dayMap[ev.dateKey]=[]; dayMap[ev.dateKey].push(ev); });
@@ -7267,7 +7494,7 @@ function gkeys(e){
   if(e.metaKey&&(e.key==='?'||(e.shiftKey&&e.key==='/'))){e.preventDefault();togglePanelPin('nav');}
   if((e.metaKey||e.ctrlKey)&&e.key==='['){e.preventDefault();togglePanelPin('nav');}
   if((e.metaKey||e.ctrlKey)&&e.key===']'){e.preventDefault();togglePanelPin('agenda');}
-  if(e.metaKey&&e.key==='.'){
+  if((e.metaKey||e.ctrlKey)&&e.key==='.'){
     e.preventDefault();
     const div=S.focusNode||document.activeElement?.closest('.node');
     if(div){
@@ -7280,13 +7507,10 @@ function gkeys(e){
   }
   if(e.ctrlKey&&e.key==='`'){e.preventDefault();toggleAppMode();}
   if(e.ctrlKey&&!e.metaKey&&e.key==='t'){e.preventDefault();navigateToDate(TODAY_KEY);}
-  if(e.ctrlKey&&!e.metaKey&&e.key==='u'){e.preventDefault();_tutFire('keydown',e);openTodosModal();}
-  if(e.metaKey&&!e.shiftKey&&e.key==='u'){e.preventDefault();_tutFire('keydown',e);openTodosModal();}
-  if(e.metaKey&&e.key===','){e.preventDefault();openSettings();}
-  // ⌘X = cut focused node text OR cut selected nodes
-  if(e.metaKey&&e.key==='x'&&!e.shiftKey){
-    const focused = document.activeElement;
-    // Only intercept if not in a text field actively editing
+  if((e.metaKey||e.ctrlKey)&&e.key==='u'){e.preventDefault();_tutFire('keydown',e);openTodosModal();}
+  if((e.metaKey||e.ctrlKey)&&e.key===','){e.preventDefault();openSettings();}
+  // Ctrl/⌘X = cut selected nodes
+  if((e.metaKey||e.ctrlKey)&&e.key==='x'&&!e.shiftKey){
     if(SEL.items.size>0){
       e.preventDefault();
       syncPageFromDOM();historyPush();
@@ -7299,13 +7523,14 @@ function gkeys(e){
       toast('✗ Cut '+_apexClipboard.length+' node'+(_apexClipboard.length!==1?'s':''));
     }
   }
-  if(e.metaKey&&e.shiftKey&&e.key==='G'){e.preventDefault();openMockCal();}
-  if(e.metaKey&&e.shiftKey&&e.key==='M'){e.preventDefault();openMockCal();switchMockView('gmail');}
+  if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key==='G'){e.preventDefault();openMockCal();}
+  if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key==='M'){e.preventDefault();openMockCal();switchMockView('gmail');}
   if(e.metaKey&&!e.shiftKey&&e.key==='n'){e.preventDefault();createNewPage();}
-  if(e.metaKey&&e.shiftKey&&e.key==='C'){e.preventDefault();convertNodeToPage();}
-  if(e.metaKey&&!e.shiftKey&&e.key==='z'){e.preventDefault();historyUndo();}
-  if(e.metaKey&&e.shiftKey&&e.key==='z'){e.preventDefault();historyRedo();}
-  if((e.metaKey||e.ctrlKey)&&e.key==='d'){e.preventDefault();toggleDone();}
+  if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key==='C'){e.preventDefault();convertNodeToPage();}
+  if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&e.key==='z'){e.preventDefault();historyUndo();}
+  if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key==='z'){e.preventDefault();historyRedo();}
+  // Done: ⌘D (Mac) or Ctrl+Shift+D (Windows — avoids Chrome bookmark conflict)
+  if((e.metaKey&&!e.ctrlKey&&!e.shiftKey&&e.key==='d')||(e.ctrlKey&&!e.metaKey&&e.shiftKey&&e.key==='d')){e.preventDefault();toggleDone();}
   // Ctrl+/ = toggle para/bullet
   if(e.ctrlKey&&!e.metaKey&&!e.altKey&&e.key==='/'){
     e.preventDefault();
