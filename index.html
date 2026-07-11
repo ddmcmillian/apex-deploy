@@ -1099,10 +1099,15 @@ body.theme-intersection .sbi.on .ico{color:var(--accent)}
     gap:3px;background:none;border:none;color:var(--text3);
     font-family:var(--font);font-size:9px;letter-spacing:.04em;text-transform:uppercase;
     cursor:pointer;padding:4px 0;-webkit-tap-highlight-color:transparent;
-    transition:color var(--ease);
+    transition:color var(--ease);touch-action:manipulation;
   }
   .mob-tab.active{color:var(--accent)}
-  .mob-tab svg{width:20px;height:20px;stroke-width:1.8}
+  .mob-tab svg{width:20px;height:20px;stroke-width:1.8;pointer-events:none}
+  .mob-tab i,.mob-tab span{pointer-events:none}
+  /* swipe-to-indent visual feedback on bullet */
+  .nbw.swipe-hint{transform:scale(1.4);transition:transform .1s ease}
+  .nb.swipe-right{background:var(--accent)!important;box-shadow:0 0 8px rgba(204,141,110,.6)}
+  .nb.swipe-left{background:var(--warm-blue)!important;box-shadow:0 0 8px rgba(91,158,201,.6)}
   /* context menus — full width on mobile */
   .ctx,.tpick{min-width:90vw!important;left:5vw!important;right:5vw!important}
   /* modals — full width */
@@ -8079,18 +8084,20 @@ function renderContactHeader(handle){
 </nav>
 <script>
 (function(){
-  const TABS = ['notes','pages','agenda','capture'];
-  let _activeTab = 'notes';
+  // ─── TAB SWITCHING ───────────────────────────────────────────────────────
+  let _tabLock = false;
 
   window.mobSwitchTab = function(tab) {
+    if (_tabLock) return;
+    _tabLock = true;
+    setTimeout(function(){ _tabLock = false; }, 300);
+
     const sb = document.getElementById('sidebar');
     const ag = document.getElementById('agendaPanel');
-
     sb.classList.remove('mob-open');
     ag.classList.remove('mob-open');
-    document.querySelectorAll('.mob-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.mob-tab').forEach(function(t){ t.classList.remove('active'); });
 
-    _activeTab = tab;
     if (tab === 'pages') {
       sb.classList.add('mob-open');
       document.getElementById('mobTabPages').classList.add('active');
@@ -8105,18 +8112,96 @@ function renderContactHeader(handle){
     }
   };
 
-  // Close overlay panels when navigating to a page from sidebar
-  const _origNavPage = window.navPage;
-  if (typeof _origNavPage === 'function') {
-    window.navPage = function() {
-      _origNavPage.apply(this, arguments);
+  // Auto-return to Notes tab when user opens a page from the sidebar
+  function _mobAutoNotes(orig) {
+    return function() {
+      orig.apply(this, arguments);
       if (window.innerWidth <= 768) mobSwitchTab('notes');
     };
   }
+  window.addEventListener('load', function() {
+    if (typeof openPage === 'function') window.openPage = _mobAutoNotes(openPage);
+    if (typeof navigateToDate === 'function') window.navigateToDate = _mobAutoNotes(navigateToDate);
+  });
 
-  // Re-init lucide icons for the tab bar
+  // ─── SWIPE BULLET → INDENT / OUTDENT ────────────────────────────────────
+  // Touch-only: desktop drag/keyboard is completely unaffected.
+  var SWIPE_MIN = 44;   // px horizontal movement to trigger
+  var SWIPE_RATIO = 1.5; // must be this much more horizontal than vertical
+  var _sx = 0, _sy = 0, _sNbw = null, _sNode = null, _sMoved = false;
+
+  document.addEventListener('touchstart', function(e) {
+    var nbw = e.target.closest && e.target.closest('.nbw');
+    if (!nbw) { _sNbw = null; return; }
+    var node = nbw.closest('.node');
+    if (!node) { _sNbw = null; return; }
+    _sNbw = nbw;
+    _sNode = node;
+    _sx = e.touches[0].clientX;
+    _sy = e.touches[0].clientY;
+    _sMoved = false;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!_sNbw) return;
+    var dx = Math.abs(e.touches[0].clientX - _sx);
+    var dy = Math.abs(e.touches[0].clientY - _sy);
+    if (dx > dy && dx > 8) {
+      _sMoved = true;
+      e.preventDefault(); // lock scroll during horizontal swipe
+      // visual hint on bullet dot
+      var dot = _sNbw.querySelector('.nb');
+      if (dot) {
+        dot.classList.toggle('swipe-right', e.touches[0].clientX - _sx > 0);
+        dot.classList.toggle('swipe-left',  e.touches[0].clientX - _sx < 0);
+      }
+    }
+  }, { passive: false });
+
+  document.addEventListener('touchend', function(e) {
+    if (!_sNbw || !_sNode || !_sMoved) { _cleanup(); return; }
+    var dx = e.changedTouches[0].clientX - _sx;
+    var dy = e.changedTouches[0].clientY - _sy;
+
+    if (Math.abs(dx) >= SWIPE_MIN && Math.abs(dx) > Math.abs(dy) * SWIPE_RATIO) {
+      var nodeId = _sNode.dataset.id;
+      var nodeModel = (typeof DB !== 'undefined') && DB.nodes_ref && DB.nodes_ref[nodeId];
+      if (nodeModel && !nodeModel.para) {
+        syncPageFromDOM();
+        historyPush();
+        var ok = false;
+        if (dx > 0) {
+          ok = indentNodeInModel(nodeId) && indentNodeDOM(_sNode);
+          if (ok && typeof toast === 'function') toast('↳ Indented');
+        } else {
+          ok = unindentNodeInModel(nodeId) && unindentNodeDOM(_sNode);
+          if (ok && typeof toast === 'function') toast('↑ Outdented');
+        }
+        if (ok) {
+          if (typeof updateStatus === 'function') updateStatus();
+          if (typeof runGravity === 'function') runGravity();
+          if (typeof TODAY_KEY !== 'undefined' && typeof S !== 'undefined' && S.currentPage === TODAY_KEY && typeof surfaceGravityTodos === 'function') surfaceGravityTodos();
+          if (typeof saveToLocalStorage === 'function') saveToLocalStorage();
+          if (navigator.vibrate) navigator.vibrate(30);
+        }
+      }
+    }
+    _cleanup();
+  }, { passive: true });
+
+  function _cleanup() {
+    if (_sNbw) {
+      var dot = _sNbw.querySelector('.nb');
+      if (dot) { dot.classList.remove('swipe-right', 'swipe-left'); }
+    }
+    _sNbw = null; _sNode = null; _sMoved = false;
+  }
+
+  // ─── LUCIDE ICONS FOR TAB BAR ────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function() {
-    if (typeof lucide !== 'undefined') lucide.createIcons({nodes: [document.getElementById('mobTabs')]});
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons({ nodes: [document.getElementById('mobTabs')] });
+    }
   });
 })();
 </script>
