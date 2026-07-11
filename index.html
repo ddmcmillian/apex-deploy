@@ -8309,7 +8309,7 @@ function renderContactHeader(handle){
 
   // ─── AI BOTTOM SHEET ─────────────────────────────────────────────────────
   // Worker URL — updated after `wrangler deploy`
-  var AI_WORKER_URL = localStorage.getItem('apexAI_workerUrl') || '';
+  var AI_WORKER_URL = localStorage.getItem('apexAI_workerUrl') || 'https://apex-ai.dwayne-554.workers.dev';
 
   window.openAISheet = function() {
     document.getElementById('aiBackdrop').classList.add('open');
