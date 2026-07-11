@@ -1084,7 +1084,9 @@ body.theme-intersection .sbi.on .ico{color:var(--accent)}
   /* larger tap targets */
   .sbi{min-height:44px;font-size:14px}
   .bico{width:36px;height:36px}
-  .nc{font-size:15px;line-height:1.7}
+  /* 16px minimum kills iOS auto-zoom on contenteditable/input focus */
+  .nc{font-size:16px!important;line-height:1.7}
+  input,textarea,select{font-size:16px!important}
   /* bottom tab bar */
   .mob-tabs{
     display:flex!important;
@@ -1104,10 +1106,9 @@ body.theme-intersection .sbi.on .ico{color:var(--accent)}
   .mob-tab.active{color:var(--accent)}
   .mob-tab svg{width:20px;height:20px;stroke-width:1.8;pointer-events:none}
   .mob-tab i,.mob-tab span{pointer-events:none}
-  /* swipe-to-indent visual feedback on bullet */
-  .nbw.swipe-hint{transform:scale(1.4);transition:transform .1s ease}
-  .nb.swipe-right{background:var(--accent)!important;box-shadow:0 0 8px rgba(204,141,110,.6)}
-  .nb.swipe-left{background:var(--warm-blue)!important;box-shadow:0 0 8px rgba(91,158,201,.6)}
+  /* selected node state for swipe-to-indent */
+  .node.mob-node-sel>.nrow{background:rgba(204,141,110,.1);border-radius:6px;outline:1px solid rgba(204,141,110,.25)}
+  .node.mob-node-sel>.nrow>.nbw>.nb{background:var(--accent)!important;box-shadow:0 0 10px rgba(204,141,110,.7)!important;transform:scale(1.6);transition:all .15s ease}
   /* context menus — full width on mobile */
   .ctx,.tpick{min-width:90vw!important;left:5vw!important;right:5vw!important}
   /* modals — full width */
@@ -8084,16 +8085,28 @@ function renderContactHeader(handle){
 </nav>
 <script>
 (function(){
+
   // ─── TAB SWITCHING ───────────────────────────────────────────────────────
-  let _tabLock = false;
+  var _tabLock = false;
 
   window.mobSwitchTab = function(tab) {
     if (_tabLock) return;
     _tabLock = true;
     setTimeout(function(){ _tabLock = false; }, 300);
 
-    const sb = document.getElementById('sidebar');
-    const ag = document.getElementById('agendaPanel');
+    // Close settings modal if open
+    var settingsModal = document.getElementById('settingsModal');
+    if (settingsModal && settingsModal.classList.contains('open')) {
+      settingsModal.classList.remove('open');
+    }
+
+    // Exit capture mode when switching to any other tab
+    if (tab !== 'capture' && document.body.classList.contains('capture-mode')) {
+      if (typeof toggleAppMode === 'function') toggleAppMode();
+    }
+
+    var sb = document.getElementById('sidebar');
+    var ag = document.getElementById('agendaPanel');
     sb.classList.remove('mob-open');
     ag.classList.remove('mob-open');
     document.querySelectorAll('.mob-tab').forEach(function(t){ t.classList.remove('active'); });
@@ -8105,97 +8118,119 @@ function renderContactHeader(handle){
       ag.classList.add('mob-open');
       document.getElementById('mobTabAgenda').classList.add('active');
     } else if (tab === 'capture') {
-      openCapturePage();
+      if (typeof openCapturePage === 'function') openCapturePage();
       document.getElementById('mobTabCapture').classList.add('active');
     } else {
       document.getElementById('mobTabNotes').classList.add('active');
     }
   };
 
-  // Auto-return to Notes tab when user opens a page from the sidebar
-  function _mobAutoNotes(orig) {
-    return function() {
-      orig.apply(this, arguments);
-      if (window.innerWidth <= 768) mobSwitchTab('notes');
-    };
-  }
-  window.addEventListener('load', function() {
-    if (typeof openPage === 'function') window.openPage = _mobAutoNotes(openPage);
-    if (typeof navigateToDate === 'function') window.navigateToDate = _mobAutoNotes(navigateToDate);
+  // Return to Notes tab when user taps a page link inside any panel
+  document.addEventListener('click', function(e) {
+    if (window.innerWidth > 768) return;
+    if (e.target.closest('#sidebar .sbi, #agendaPanel .ag-note, #agendaPanel .ag-event')) {
+      setTimeout(function(){ mobSwitchTab('notes'); }, 60);
+    }
   });
 
-  // ─── SWIPE BULLET → INDENT / OUTDENT ────────────────────────────────────
-  // Touch-only: desktop drag/keyboard is completely unaffected.
-  var SWIPE_MIN = 44;   // px horizontal movement to trigger
-  var SWIPE_RATIO = 1.5; // must be this much more horizontal than vertical
-  var _sx = 0, _sy = 0, _sNbw = null, _sNode = null, _sMoved = false;
+  // ─── SWIPE-TO-INDENT: TAP BULLET → SELECT → SWIPE ROW ──────────────────
+  var _mobSelNode = null;
+  var _swX = 0, _swY = 0, _swActive = false;
 
+  // touchstart: begin tracking if a node is already selected
   document.addEventListener('touchstart', function(e) {
-    var nbw = e.target.closest && e.target.closest('.nbw');
-    if (!nbw) { _sNbw = null; return; }
-    var node = nbw.closest('.node');
-    if (!node) { _sNbw = null; return; }
-    _sNbw = nbw;
-    _sNode = node;
-    _sx = e.touches[0].clientX;
-    _sy = e.touches[0].clientY;
-    _sMoved = false;
+    if (window.innerWidth > 768) return;
+    if (!_mobSelNode) { _swActive = false; return; }
+    if (_mobSelNode.contains(e.target)) {
+      _swX = e.touches[0].clientX;
+      _swY = e.touches[0].clientY;
+      _swActive = true;
+    } else {
+      _swActive = false;
+    }
   }, { passive: true });
 
+  // touchmove: lock vertical scroll while swiping horizontally
   document.addEventListener('touchmove', function(e) {
-    if (!_sNbw) return;
-    var dx = Math.abs(e.touches[0].clientX - _sx);
-    var dy = Math.abs(e.touches[0].clientY - _sy);
-    if (dx > dy && dx > 8) {
-      _sMoved = true;
-      e.preventDefault(); // lock scroll during horizontal swipe
-      // visual hint on bullet dot
-      var dot = _sNbw.querySelector('.nb');
-      if (dot) {
-        dot.classList.toggle('swipe-right', e.touches[0].clientX - _sx > 0);
-        dot.classList.toggle('swipe-left',  e.touches[0].clientX - _sx < 0);
-      }
-    }
+    if (!_swActive || !_mobSelNode) return;
+    var dx = Math.abs(e.touches[0].clientX - _swX);
+    var dy = Math.abs(e.touches[0].clientY - _swY);
+    if (dx > dy && dx > 8) e.preventDefault();
   }, { passive: false });
 
+  // touchend: priority order — swipe → bullet tap → deselect
   document.addEventListener('touchend', function(e) {
-    if (!_sNbw || !_sNode || !_sMoved) { _cleanup(); return; }
-    var dx = e.changedTouches[0].clientX - _sx;
-    var dy = e.changedTouches[0].clientY - _sy;
+    if (window.innerWidth > 768) { _swActive = false; return; }
 
-    if (Math.abs(dx) >= SWIPE_MIN && Math.abs(dx) > Math.abs(dy) * SWIPE_RATIO) {
-      var nodeId = _sNode.dataset.id;
-      var nodeModel = (typeof DB !== 'undefined') && DB.nodes_ref && DB.nodes_ref[nodeId];
-      if (nodeModel && !nodeModel.para) {
-        syncPageFromDOM();
-        historyPush();
-        var ok = false;
-        if (dx > 0) {
-          ok = indentNodeInModel(nodeId) && indentNodeDOM(_sNode);
-          if (ok && typeof toast === 'function') toast('↳ Indented');
-        } else {
-          ok = unindentNodeInModel(nodeId) && unindentNodeDOM(_sNode);
-          if (ok && typeof toast === 'function') toast('↑ Outdented');
+    // Priority 1: finish a horizontal swipe on selected node
+    if (_swActive && _mobSelNode) {
+      var dx = e.changedTouches[0].clientX - _swX;
+      var dy = e.changedTouches[0].clientY - _swY;
+      _swActive = false;
+
+      if (Math.abs(dx) >= 44 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        var node = _mobSelNode;
+        var nodeId = node.dataset.id;
+        var nm = typeof DB !== 'undefined' && DB.nodes_ref && DB.nodes_ref[nodeId];
+        if (nm && !nm.para) {
+          syncPageFromDOM();
+          historyPush();
+          var ok = false;
+          if (dx > 0) {
+            ok = indentNodeInModel(nodeId) && indentNodeDOM(node);
+            toast(ok ? '↳ Indented' : 'Nothing to indent under');
+          } else {
+            ok = unindentNodeInModel(nodeId) && unindentNodeDOM(node);
+            toast(ok ? '↑ Outdented' : 'Already at top level');
+          }
+          if (ok) {
+            node.classList.add('mob-node-sel');
+            _mobSelNode = node;
+            if (typeof updateStatus === 'function') updateStatus();
+            if (typeof runGravity === 'function') runGravity();
+            if (typeof TODAY_KEY !== 'undefined' && typeof S !== 'undefined' && S.currentPage === TODAY_KEY) {
+              if (typeof surfaceGravityTodos === 'function') surfaceGravityTodos();
+            }
+            if (typeof saveToLocalStorage === 'function') saveToLocalStorage();
+            if (navigator.vibrate) navigator.vibrate(30);
+          }
         }
-        if (ok) {
-          if (typeof updateStatus === 'function') updateStatus();
-          if (typeof runGravity === 'function') runGravity();
-          if (typeof TODAY_KEY !== 'undefined' && typeof S !== 'undefined' && S.currentPage === TODAY_KEY && typeof surfaceGravityTodos === 'function') surfaceGravityTodos();
-          if (typeof saveToLocalStorage === 'function') saveToLocalStorage();
-          if (navigator.vibrate) navigator.vibrate(30);
-        }
+        return;
       }
+      // Short swipe — fall through to tap handling below
     }
-    _cleanup();
-  }, { passive: true });
+    _swActive = false;
 
-  function _cleanup() {
-    if (_sNbw) {
-      var dot = _sNbw.querySelector('.nb');
-      if (dot) { dot.classList.remove('swipe-right', 'swipe-left'); }
+    // Priority 2: bullet dot tap → toggle selection
+    var nbw = e.target.closest && e.target.closest('.nbw');
+    if (nbw) {
+      e.preventDefault(); // blocks contenteditable focus → no iOS zoom
+      var node = nbw.closest('.node');
+      if (!node) return;
+      if (_mobSelNode && _mobSelNode !== node) {
+        _mobSelNode.classList.remove('mob-node-sel');
+      }
+      if (_mobSelNode === node) {
+        // Second tap on same bullet → deselect and open for editing
+        node.classList.remove('mob-node-sel');
+        _mobSelNode = null;
+        var nc = node.querySelector('.nc');
+        if (nc) nc.focus();
+      } else {
+        // First tap → select node, ready to swipe
+        node.classList.add('mob-node-sel');
+        _mobSelNode = node;
+        if (navigator.vibrate) navigator.vibrate(15);
+      }
+      return;
     }
-    _sNbw = null; _sNode = null; _sMoved = false;
-  }
+
+    // Priority 3: tap anywhere outside → deselect
+    if (_mobSelNode && !_mobSelNode.contains(e.target)) {
+      _mobSelNode.classList.remove('mob-node-sel');
+      _mobSelNode = null;
+    }
+  }, { passive: false });
 
   // ─── LUCIDE ICONS FOR TAB BAR ────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function() {
@@ -8203,6 +8238,7 @@ function renderContactHeader(handle){
       lucide.createIcons({ nodes: [document.getElementById('mobTabs')] });
     }
   });
+
 })();
 </script>
 </body>
