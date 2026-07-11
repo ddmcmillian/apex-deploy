@@ -1076,8 +1076,8 @@ body.theme-intersection .sbi.on .ico{color:var(--accent)}
   }
   .sb.mob-open .panel-inner,.agenda.mob-open .panel-inner{flex:1;overflow:hidden;display:flex;flex-direction:column}
   .sb.mob-open .sbsc,.agenda.mob-open .ag-entries{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
-  /* full-height body for dvh support */
-  body{height:100dvh}
+  /* 100vh stays fixed when keyboard appears — dvh resizes and causes layout jump */
+  body{height:100vh}
   .app{height:100%}
   /* editor padding clears bottom tab bar */
   .edwrap{padding:20px 16px calc(72px + env(safe-area-inset-bottom,0px));scroll-behavior:smooth}
@@ -8100,9 +8100,20 @@ function renderContactHeader(handle){
       settingsModal.classList.remove('open');
     }
 
-    // Exit capture mode when switching to any other tab
-    if (tab !== 'capture' && document.body.classList.contains('capture-mode')) {
-      if (typeof toggleAppMode === 'function') toggleAppMode();
+    // Exit capture mode when switching away.
+    // openCapturePage() sets the CSS class but NOT APP_MODE, so check both independently.
+    var inCapture = (typeof APP_MODE !== 'undefined' && APP_MODE === 'capture') ||
+                    document.body.classList.contains('capture-mode');
+    if (tab !== 'capture' && inCapture) {
+      if (typeof APP_MODE !== 'undefined' && APP_MODE === 'capture') {
+        // toggleAppMode handles cleanup + navigates to Today
+        if (typeof toggleAppMode === 'function') toggleAppMode();
+      } else {
+        // CSS class was set directly by openCapturePage — clean up manually
+        document.body.classList.remove('capture-mode');
+        var _mb = document.getElementById('appModeBtn');
+        if (_mb) _mb.classList.remove('on');
+      }
     }
 
     var sb = document.getElementById('sidebar');
@@ -8118,7 +8129,12 @@ function renderContactHeader(handle){
       ag.classList.add('mob-open');
       document.getElementById('mobTabAgenda').classList.add('active');
     } else if (tab === 'capture') {
-      if (typeof openCapturePage === 'function') openCapturePage();
+      // Use toggleAppMode so APP_MODE stays in sync with the CSS class
+      if (typeof APP_MODE !== 'undefined' && APP_MODE !== 'capture') {
+        if (typeof toggleAppMode === 'function') toggleAppMode();
+      } else if (typeof openCapturePage === 'function') {
+        openCapturePage();
+      }
       document.getElementById('mobTabCapture').classList.add('active');
     } else {
       document.getElementById('mobTabNotes').classList.add('active');
@@ -8135,12 +8151,15 @@ function renderContactHeader(handle){
 
   // ─── SWIPE-TO-INDENT: TAP BULLET → SELECT → SWIPE ROW ──────────────────
   var _mobSelNode = null;
-  var _swX = 0, _swY = 0, _swActive = false;
+  var _swX = 0, _swY = 0, _swActive = false, _swMoved = false;
 
   // touchstart: begin tracking if a node is already selected
   document.addEventListener('touchstart', function(e) {
     if (window.innerWidth > 768) return;
+    _swMoved = false;
     if (!_mobSelNode) { _swActive = false; return; }
+    // Guard against stale references after DOM re-renders
+    if (!document.contains(_mobSelNode)) { _mobSelNode = null; _swActive = false; return; }
     if (_mobSelNode.contains(e.target)) {
       _swX = e.touches[0].clientX;
       _swY = e.touches[0].clientY;
@@ -8155,7 +8174,7 @@ function renderContactHeader(handle){
     if (!_swActive || !_mobSelNode) return;
     var dx = Math.abs(e.touches[0].clientX - _swX);
     var dy = Math.abs(e.touches[0].clientY - _swY);
-    if (dx > dy && dx > 8) e.preventDefault();
+    if (dx > dy && dx > 8) { _swMoved = true; e.preventDefault(); }
   }, { passive: false });
 
   // touchend: priority order — swipe → bullet tap → deselect
@@ -8168,7 +8187,7 @@ function renderContactHeader(handle){
       var dy = e.changedTouches[0].clientY - _swY;
       _swActive = false;
 
-      if (Math.abs(dx) >= 44 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (_swMoved && Math.abs(dx) >= 44 && Math.abs(dx) > Math.abs(dy) * 1.5) {
         var node = _mobSelNode;
         var nodeId = node.dataset.id;
         var nm = typeof DB !== 'undefined' && DB.nodes_ref && DB.nodes_ref[nodeId];
@@ -8197,9 +8216,11 @@ function renderContactHeader(handle){
         }
         return;
       }
-      // Short swipe — fall through to tap handling below
+      // Any horizontal movement happened — don't treat as bullet tap (prevents accidental deselect)
+      if (_swMoved) { _swMoved = false; return; }
     }
     _swActive = false;
+    _swMoved = false;
 
     // Priority 2: bullet dot tap → toggle selection
     var nbw = e.target.closest && e.target.closest('.nbw');
