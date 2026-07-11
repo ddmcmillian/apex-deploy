@@ -1117,6 +1117,32 @@ body.theme-intersection .sbi.on .ico{color:var(--accent)}
   /* modals — full width */
   .modal-box{max-width:100vw!important;margin:0!important;border-radius:0!important;height:100dvh!important}
 }
+/* ── AI BOTTOM SHEET (all screen sizes, shown only on mobile via JS) ── */
+.ai-sheet{
+  position:fixed;bottom:0;left:0;right:0;z-index:1100;
+  background:var(--bg2);border-top:1px solid var(--border);
+  border-radius:16px 16px 0 0;
+  padding:0 0 env(safe-area-inset-bottom,0px);
+  transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+  max-height:80vh;display:flex;flex-direction:column;
+}
+.ai-sheet.open{transform:translateY(0)}
+.ai-sheet-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:10px auto 0}
+.ai-sheet-hdr{display:flex;align-items:center;gap:8px;padding:12px 16px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.ai-sheet-title{font-family:var(--font);font-size:13px;font-weight:600;color:var(--text);flex:1}
+.ai-sheet-close{background:none;border:none;color:var(--text3);cursor:pointer;padding:4px;font-size:16px;line-height:1}
+.ai-actions{display:flex;gap:8px;padding:12px 16px;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.ai-action-btn{flex-shrink:0;padding:7px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-family:var(--font);font-size:12px;cursor:pointer;white-space:nowrap;transition:all var(--ease);-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.ai-action-btn:active,.ai-action-btn.active{background:var(--accent);border-color:var(--accent);color:#000;font-weight:600}
+.ai-ask-row{display:flex;gap:8px;padding:0 16px 12px;flex-shrink:0}
+.ai-ask-input{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--font);font-size:16px;padding:8px 12px;outline:none}
+.ai-ask-input:focus{border-color:var(--accent)}
+.ai-ask-send{background:var(--accent);border:none;border-radius:8px;color:#000;font-size:16px;width:38px;flex-shrink:0;cursor:pointer;touch-action:manipulation}
+.ai-result{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px 16px;font-size:14px;color:var(--text2);line-height:1.7;white-space:pre-wrap}
+.ai-result-placeholder{color:var(--text3);font-size:13px;text-align:center;padding-top:24px}
+.ai-spinner{display:flex;align-items:center;justify-content:center;padding:32px;gap:8px;color:var(--text3);font-size:13px}
+.ai-backdrop{position:fixed;inset:0;z-index:1099;display:none}
+.ai-backdrop.open{display:block}
 </style>
 <!-- PWA -->
 <link rel="manifest" id="pwa-manifest">
@@ -8068,6 +8094,29 @@ function renderContactHeader(handle){
 <!-- CONTACT FIELD PICKER (header) -->
 <div id="cfieldDrop" class="at-drop" style="min-width:220px"></div>
 
+<!-- AI BOTTOM SHEET -->
+<div class="ai-backdrop" id="aiBackdrop" onclick="closeAISheet()"></div>
+<div class="ai-sheet" id="aiSheet">
+  <div class="ai-sheet-handle"></div>
+  <div class="ai-sheet-hdr">
+    <span style="color:var(--accent);font-size:16px">✦</span>
+    <span class="ai-sheet-title" id="aiSheetTitle">Ask Claude</span>
+    <button class="ai-sheet-close" onclick="closeAISheet()">✕</button>
+  </div>
+  <div class="ai-actions">
+    <button class="ai-action-btn" onclick="runAI('summarize')">Summarize</button>
+    <button class="ai-action-btn" onclick="runAI('todos')">Extract Todos</button>
+    <button class="ai-action-btn" onclick="runAI('cleanup')">Clean Up</button>
+  </div>
+  <div class="ai-ask-row">
+    <input class="ai-ask-input" id="aiAskInput" placeholder="Ask anything about this page…" onkeydown="if(event.key==='Enter')runAI('ask')">
+    <button class="ai-ask-send" onclick="runAI('ask')">↑</button>
+  </div>
+  <div class="ai-result" id="aiResult">
+    <div class="ai-result-placeholder">Choose an action or type a question above.</div>
+  </div>
+</div>
+
 <!-- MOBILE BOTTOM TAB BAR -->
 <nav class="mob-tabs" id="mobTabs" aria-label="Main navigation">
   <button class="mob-tab active" id="mobTabNotes" onclick="mobSwitchTab('notes')" aria-label="Notes">
@@ -8082,8 +8131,8 @@ function renderContactHeader(handle){
   <button class="mob-tab" id="mobTabCapture" onclick="mobSwitchTab('capture')" aria-label="Capture">
     <i data-lucide="zap"></i><span>Capture</span>
   </button>
-  <button class="mob-tab" id="mobTabMore" onclick="openSettings()" aria-label="Settings">
-    <i data-lucide="settings"></i><span>More</span>
+  <button class="mob-tab" id="mobTabAI" onclick="openAISheet()" aria-label="Ask Claude">
+    <i data-lucide="sparkles"></i><span>Ask AI</span>
   </button>
 </nav>
 <script>
@@ -8257,6 +8306,63 @@ function renderContactHeader(handle){
       _mobSelNode = null;
     }
   }, { passive: false });
+
+  // ─── AI BOTTOM SHEET ─────────────────────────────────────────────────────
+  // Worker URL — updated after `wrangler deploy`
+  var AI_WORKER_URL = localStorage.getItem('apexAI_workerUrl') || '';
+
+  window.openAISheet = function() {
+    document.getElementById('aiBackdrop').classList.add('open');
+    document.getElementById('aiSheet').classList.add('open');
+    var page = typeof S !== 'undefined' && DB && DB.pageStore && DB.pageStore[S.currentPage];
+    var title = page ? (document.getElementById('pageTitle')?.textContent || 'Untitled') : 'Untitled';
+    document.getElementById('aiSheetTitle').textContent = '✦ ' + title;
+    document.getElementById('aiAskInput').value = '';
+  };
+
+  window.closeAISheet = function() {
+    document.getElementById('aiBackdrop').classList.remove('open');
+    document.getElementById('aiSheet').classList.remove('open');
+  };
+
+  window.runAI = async function(action) {
+    if (!AI_WORKER_URL) {
+      var url = prompt('Enter your apex-ai Worker URL (e.g. https://apex-ai.your-name.workers.dev):');
+      if (!url) return;
+      AI_WORKER_URL = url.trim();
+      localStorage.setItem('apexAI_workerUrl', AI_WORKER_URL);
+    }
+
+    var resultEl = document.getElementById('aiResult');
+    var question = document.getElementById('aiAskInput').value.trim();
+    if (action === 'ask' && !question) {
+      document.getElementById('aiAskInput').focus();
+      return;
+    }
+
+    // Collect page text
+    var pageTitle = document.getElementById('pageTitle')?.textContent || 'Untitled';
+    var nodes = [...document.querySelectorAll('#oRoot .nc')];
+    var content = nodes.map(function(n){ return n.innerText.trim(); }).filter(Boolean).join('\n');
+    if (!content) { resultEl.innerHTML = '<div class="ai-result-placeholder">This page has no content yet.</div>'; return; }
+
+    // Show spinner
+    resultEl.innerHTML = '<div class="ai-spinner"><i data-lucide="loader" style="animation:spin 1s linear infinite"></i> Thinking…</div>';
+    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [resultEl] });
+
+    try {
+      var res = await fetch(AI_WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, content, pageTitle, question })
+      });
+      var data = await res.json();
+      if (data.error) throw new Error(data.error);
+      resultEl.textContent = data.result;
+    } catch(err) {
+      resultEl.innerHTML = '<div class="ai-result-placeholder" style="color:var(--overdue)">Error: ' + err.message + '</div>';
+    }
+  };
 
   // ─── LUCIDE ICONS FOR TAB BAR ────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function() {

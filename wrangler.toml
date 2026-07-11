@@ -1,0 +1,6 @@
+name = "apex-ai"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# After deploying, set your key with:
+#   wrangler secret put ANTHROPIC_API_KEY
