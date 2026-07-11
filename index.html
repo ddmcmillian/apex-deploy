@@ -1109,6 +1109,9 @@ body.theme-intersection .sbi.on .ico{color:var(--accent)}
   /* selected node state for swipe-to-indent */
   .node.mob-node-sel>.nrow{background:rgba(204,141,110,.1);border-radius:6px;outline:1px solid rgba(204,141,110,.25)}
   .node.mob-node-sel>.nrow>.nbw>.nb{background:var(--accent)!important;box-shadow:0 0 10px rgba(204,141,110,.7)!important;transform:scale(1.6);transition:all .15s ease}
+  /* prevent horizontal scroll/drift at all times; allow vertical + pinch-zoom */
+  html,body,.app{overflow-x:hidden;max-width:100vw}
+  .edwrap{touch-action:pan-y pinch-zoom;overflow-x:hidden}
   /* context menus — full width on mobile */
   .ctx,.tpick{min-width:90vw!important;left:5vw!important;right:5vw!important}
   /* modals — full width */
@@ -8222,9 +8225,11 @@ function renderContactHeader(handle){
     _swActive = false;
     _swMoved = false;
 
-    // Priority 2: bullet dot tap → toggle selection
+    // Priority 2: bullet dot tap → toggle selection (caret taps fall through naturally)
     var nbw = e.target.closest && e.target.closest('.nbw');
     if (nbw) {
+      // Caret (▶/▼): don't intercept — let the existing click handler collapse/expand
+      if (e.target.closest('.nb-caret')) return;
       e.preventDefault(); // blocks contenteditable focus → no iOS zoom
       var node = nbw.closest('.node');
       if (!node) return;
